@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Тесты конвертера</title>
+    <style>
+      body {
+        max-width: 760px;
+        margin: 48px auto;
+        padding: 0 20px;
+        color: #17251e;
+        font: 16px/1.6 "Segoe UI", sans-serif;
+      }
+      li[data-result="pass"] {
+        color: #196c4a;
+      }
+      li[data-result="fail"] {
+        color: #b42323;
+      }
+      #summary[data-result="fail"] {
+        color: #b42323;
+      }
+      code {
+        overflow-wrap: anywhere;
+      }
+    </style>
+    <script type="module" src="./test-runner.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Проверки конвертера</h1>
+      <p id="summary" role="status" aria-live="polite">Выполняются проверки…</p>
+      <ol id="results"></ol>
+    </main>
+  </body>
+</html>
