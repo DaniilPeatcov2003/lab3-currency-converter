@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Простой конвертер валют с актуальными курсами и понятным результатом."
+    />
+    <title>Конвертер валют</title>
+    <link rel="preconnect" href="https://api.frankfurter.dev" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="./" aria-label="Конвертер валют — главная">
+          <span class="brand-mark" aria-hidden="true">↗</span>
+          <span>Курс<span class="brand-accent"> рядом</span></span>
+        </a>
+        <span class="header-note">Простой конвертер валют</span>
+      </header>
+
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span class="live-dot"></span> Актуальные курсы валют</p>
+        <h1 id="page-title">Конвертируйте<br />с уверенностью</h1>
+        <p class="hero-copy">
+          Выберите валюты и сумму — мы покажем результат по последнему доступному курсу.
+        </p>
+
+        <form class="converter-card" id="converter-form" novalidate>
+          <div class="amount-field">
+            <label for="amount">Сумма</label>
+            <input
+              id="amount"
+              name="amount"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder="Например, 100"
+              aria-describedby="error-message"
+              required
+            />
+          </div>
+
+          <div class="currency-fields">
+            <div class="currency-field">
+              <label for="from-currency">Из валюты</label>
+              <select id="from-currency" name="fromCurrency" aria-label="Исходная валюта"></select>
+            </div>
+
+            <button
+              class="swap-button"
+              id="swap-currencies"
+              type="button"
+              aria-label="Поменять валюты местами"
+              title="Поменять валюты местами"
+            >
+              <span aria-hidden="true">↕</span>
+            </button>
+
+            <div class="currency-field">
+              <label for="to-currency">В валюту</label>
+              <select id="to-currency" name="toCurrency" aria-label="Целевая валюта"></select>
+            </div>
+          </div>
+
+          <p class="error-message" id="error-message" role="alert" hidden></p>
+          <button class="convert-button" id="convert-button" type="submit" disabled>
+            Конвертировать <span aria-hidden="true">→</span>
+          </button>
+
+          <section class="result-panel" id="result-panel" aria-label="Результат" hidden>
+            <p class="warning-banner" id="warning-banner" role="status" hidden></p>
+            <p class="result-label">Вы получите</p>
+            <p class="result-line">
+              <span id="result-caption"></span>
+              <strong id="result-amount"></strong>
+              <span class="result-currency" id="result-currency"></span>
+            </p>
+            <p class="rate-details" id="rate-details"></p>
+          </section>
+          <p class="visually-hidden" id="result-status" role="status" aria-live="polite"></p>
+        </form>
+
+        <p class="data-note">
+          Курсы предоставлены Frankfurter на основе данных Европейского центрального банка.
+          Курсы обновляются по рабочим дням.
+        </p>
+      </section>
+
+      <footer class="site-footer">
+        <span>Для справки — не является финансовой рекомендацией.</span>
+        <span>Без регистрации и хранения данных.</span>
+      </footer>
+    </main>
+  </body>
+</html>
