@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-07
 
-**Status**: Draft
+**Status**: Ready
 
 **Input**: User description: "Create a currency converter application for converting values between currencies with a simple, reliable user interface."
 
@@ -22,6 +22,8 @@ A user opens the application, enters an amount, selects a source currency and a 
 
 1. **Given** the app is loaded and all inputs are available, **When** a user enters a valid amount and selects currencies, **Then** the app calculates and displays the converted result.
 2. **Given** the user changes either currency selection, **When** the conversion is recalculated, **Then** the result updates to reflect the selected pair.
+3. **Given** required inputs are empty, **When** the app is first loaded, **Then** the conversion button remains disabled until an amount is entered.
+4. **Given** the source and target currencies are the same, **When** the user converts an amount, **Then** the result equals the input amount without a provider request.
 
 ---
 
@@ -42,7 +44,7 @@ A user enters an empty, negative, or non-numeric value and receives a clear vali
 
 ### User Story 3 - Show a reliable outcome when exchange data is unavailable (Priority: P2)
 
-A user attempts to convert currency when the rate source is unavailable or temporarily fails, and the app explains the issue without crashing or showing a false result.
+A user attempts to convert currency when the rate source is unavailable or temporarily fails, and the app explains the issue without crashing or showing a false result. If a previously saved rate is available, the app offers that dated rate for offline conversion.
 
 **Why this priority**: Reliable error handling is essential for a trustworthy financial tool and prevents silent failures.
 
@@ -50,8 +52,10 @@ A user attempts to convert currency when the rate source is unavailable or tempo
 
 **Acceptance Scenarios**:
 
-1. **Given** the rate provider is unavailable, **When** the user requests conversion, **Then** the app displays a clear error message and does not show a misleading total.
+1. **Given** the rate provider is unavailable and no saved quote exists, **When** the user requests conversion, **Then** the app displays a clear error message and does not show a misleading total.
 2. **Given** the app is loading exchange data, **When** the request is delayed, **Then** the app indicates the conversion is pending or unavailable without breaking the interface.
+3. **Given** a saved quote exists for the selected pair, **When** the rate provider cannot be reached, **Then** the app converts using that quote and clearly identifies it as cached with its original rate date.
+4. **Given** the provider has no rate for the current non-business day, **When** the latest-rate endpoint responds, **Then** the app uses the last published quote and displays its publication date as the latest available rate.
 
 ---
 
@@ -76,6 +80,11 @@ A user attempts to convert currency when the rate source is unavailable or tempo
 - **FR-008**: The system MUST support at least a small set of common currencies for the initial version.
 - **FR-009**: The system MUST allow users to swap source and target currencies quickly when desired.
 - **FR-010**: The system MUST keep the conversion workflow simple enough for a first-time user to complete without training.
+- **FR-011**: The system MUST keep the conversion button disabled until the amount field contains a value.
+- **FR-012**: The system MUST save each successfully retrieved currency-pair quote locally and retain it across application restarts.
+- **FR-013**: When online rate retrieval fails, the system MUST offer a saved quote for the selected pair if one exists, visibly identify it as cached, and show its rate date.
+- **FR-014**: The system MUST identify the source and publication date of each displayed rate, including rates returned for weekends or holidays.
+- **FR-015**: The system MUST handle identical source and target currencies as a 1:1 conversion without a rate-service request.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -96,8 +105,8 @@ A user attempts to convert currency when the rate source is unavailable or tempo
 
 ## Assumptions
 
-- Users have a modern browser with access to the internet for live exchange data.
+- Users have a modern browser; internet access is needed for a first live quote, but a previously saved quote remains available offline.
 - The initial product version focuses on a simple browser-based interface rather than a full financial platform.
-- Currency data may come from a trusted public exchange-rate source or a local rate table during development.
+- Currency data comes from the public Frankfurter API, which publishes European Central Bank reference rates on working days and returns the latest published date outside publication days.
 - The application does not require user accounts, authentication, or persistent personal financial data.
 - The release scope prioritizes conversion accuracy and robust validation over advanced portfolio, analytics, or historical charting features.

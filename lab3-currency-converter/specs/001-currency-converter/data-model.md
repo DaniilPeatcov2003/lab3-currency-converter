@@ -22,7 +22,8 @@ Represents the market value used to convert one unit of a source currency into a
 - `base`: string, source currency code
 - `quote`: string, target currency code
 - `value`: number, conversion multiplier
-- `timestamp`: ISO-8601 string, time the rate was fetched or defined
+- `date`: ISO-8601 calendar date published by the provider
+- `cached`: boolean indicating the quote was read from persistent local storage after a provider failure
 
 **Relationships**:
 - Derived from a local rate map or external API response.
@@ -54,7 +55,9 @@ Represents the output shown to the user.
 
 **Rules**:
 - Conversion is computed as `amount * exchangeRate.value`.
-- If there is no valid rate, the result is not shown and a user-facing error is displayed instead.
+- Each successful provider quote is persisted per currency pair across browser restarts.
+- A cached quote can be used only for its exact source/target pair and must always be labeled with its saved date.
+- If neither a valid provider quote nor a valid cached quote exists, the result is not shown and a user-facing error is displayed.
 
 ## Rate Source Contract
 

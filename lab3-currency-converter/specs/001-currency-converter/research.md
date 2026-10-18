@@ -28,24 +28,43 @@
 
 ## Decision 3: Handle missing rate data gracefully
 
-**Decision**: When a rate source fails, the app shows a clear error message instead of returning misleading values.
+**Decision**: When a rate source fails, the app uses a previously saved quote for that exact currency pair when available and clearly labels it with its original date. Without a valid cache, the app shows a clear error.
 
 **Rationale**:
-- Financial results must not silently fail.
+- Cached quotes must never be presented as current.
 - The specification explicitly requires visibility of rate-source issues.
 
 **Consequences**:
-- The app is more trustworthy and user-friendly.
+- The app can still convert offline without hiding that its quote is older.
 - The UI includes a failure state as a standard user flow.
 
-## Decision 4: Use a small local rate dataset as the default source
+## Decision 4: Fetch current rates from Frankfurter
 
-**Decision**: For the initial implementation, maintain a local JSON rate map and allow later replacement with a public API or backend service.
+**Decision**: Fetch the selected currency pair from the public Frankfurter API at conversion time
+and persist the last successful quote per pair in browser local storage. On network or provider
+failure, offer the saved quote and show its publication date. Never substitute hard-coded rates.
 
 **Rationale**:
-- This keeps the app working without network setup during local development.
-- It preserves a clear path for later integration with a live provider.
+- The product requirement is to provide current exchange rates.
+- Frankfurter provides public rates without requiring an API key.
+- Showing a dated cached quote is more useful than refusing all offline conversions.
+- The latest endpoint naturally returns the last published rate on weekends and holidays.
 
 **Consequences**:
-- Development is easier and deterministic.
-- Live-rate integration can be introduced later without redesigning the core modules.
+- First-time conversion requires internet access and the rate service to be available.
+- The service boundary is isolated so it can be changed without modifying conversion logic.
+- Tests use injected responses and do not depend on the live service.
+
+## Decision 5: Use Node's built-in test runner with a browser-compatible suite
+
+**Decision**: Keep tests dependency-free, run them with `npm test` on Node.js 20+, and retain a
+browser page for the same test suite.
+
+**Rationale**:
+- Node's built-in JavaScript runtime does not require a third-party test dependency.
+- Running the same suite in Node and a browser keeps one-command local testing while preserving
+  browser verification.
+
+**Consequences**:
+- The command-line test run requires Node.js 20 or newer.
+- Browser test outcomes are also reported on a dedicated test page.

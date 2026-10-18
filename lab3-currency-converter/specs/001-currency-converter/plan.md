@@ -10,13 +10,16 @@ Build a lightweight browser-based currency converter that accepts a numeric amou
 
 ## Technical Context
 
-**Language/Version**: HTML5, CSS3, JavaScript ES2022; Node.js 20 for local tooling and tests.
+**Language/Version**: HTML5, CSS3, JavaScript ES2022.
 
-**Primary Dependencies**: No production dependency required for the v1 UI. The app can run with a simple static server and use either a small local rates file or a public exchange-rate API.
+**Primary Dependencies**: No production runtime dependency required. The browser fetches rates from
+the public Frankfurter API; Node.js 20+ is used only for the built-in test runner.
 
-**Storage**: No persistent user data. Exchange rate data is either loaded from a local JSON file or fetched from a remote rate source at runtime.
+**Storage**: No persistent user data. The most recently successful rate for each currency pair is
+stored in browser local storage and used as an explicitly dated offline fallback.
 
-**Testing**: Node.js built-in test runner (`node:test`) for conversion and validation logic; manual browser verification for UI behavior.
+**Testing**: Node.js built-in test runner, launched with `npm test`; the same suite can run in the
+browser for UI-adjacent verification.
 
 **Target Platform**: Desktop and tablet browsers; responsive web UI.
 
@@ -24,7 +27,7 @@ Build a lightweight browser-based currency converter that accepts a numeric amou
 
 **Performance Goals**: Convert and re-render results instantly for normal inputs; UI should stay responsive on common desktop browsers.
 
-**Constraints**: Single-page interface, no login/account flow, no financial advice or transaction processing, graceful handling of rate failures.
+**Constraints**: Single-page interface, no login/account flow, no financial advice or transaction processing, graceful handling of rate failures, and no hard-coded fallback exchange rates.
 
 **Scale/Scope**: Small application with one main screen, 4–10 currencies in the initial set, and no multi-user or backend persistence.
 
@@ -70,16 +73,14 @@ src/
 ├── ui.js
 ├── styles.css
 ├── index.html
-└── data/
-    └── rates.json
+└── currencies.js
 
 tests/
-├── converter.test.js
-├── validation.test.js
-└── rateService.test.js
+├── test-runner.html
+└── test-runner.js
 ```
 
-**Structure Decision**: A single-page browser application with isolated logic modules for conversion, validation, and rate loading. This keeps the feature small, testable, and easy to run without a backend.
+**Structure Decision**: A single-page browser application with isolated logic modules for conversion, validation, currency metadata, and rate loading. A dependency-free browser test runner keeps the project testable without installing a separate runtime or backend.
 
 ## Complexity Tracking
 
