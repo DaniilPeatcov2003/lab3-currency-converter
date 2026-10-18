@@ -1,47 +1,45 @@
 # Implementation Plan: Currency Converter
 
-**Branch**: `001-currency-converter` | **Date**: 2026-10-07 | **Spec**: [spec.md](./spec.md)
+**Branch**: `antigravity-build` | **Date**: 2026-10-18 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-currency-converter/spec.md`
 
 ## Summary
 
-Build a lightweight browser-based currency converter that accepts a numeric amount, supports source/target currency selection, validates input before conversion, and shows clear errors when exchange data is unavailable. The implementation will prioritize correctness, simplicity, and accessibility over a complex backend or advanced financial features.
+Build a lightweight, reliable browser-based currency converter powered by the public **Frankfurter API** (European Central Bank reference rates). The application provides robust input validation, same-currency (1:1) instant resolution, persistent rate caching in `localStorage` across restarts, and offline conversion with prominent warning banners. All test suites run with a single command `npm test` using Node.js built-in test tools with zero third-party dependencies.
 
 ## Technical Context
 
-**Language/Version**: HTML5, CSS3, JavaScript ES2022; Node.js 20 for local tooling and tests.
+**Language/Version**: HTML5, CSS3, JavaScript (ES2022 standard modules).
 
-**Primary Dependencies**: No production dependency required for the v1 UI. The app can run with a simple static server and use either a small local rates file or a public exchange-rate API.
+**Runtime Dependencies**: Zero external runtime dependencies. Live rate fetching uses browser `window.fetch` to contact `https://api.frankfurter.dev/v1/latest`.
 
-**Storage**: No persistent user data. Exchange rate data is either loaded from a local JSON file or fetched from a remote rate source at runtime.
+**Storage**: Browser `localStorage` persisting currency pairs individually under `currency_rate_{SOURCE}_{TARGET}`, storing `source`, `target`, `rate`, `date`, and `savedAt`.
 
-**Testing**: Node.js built-in test runner (`node:test`) for conversion and validation logic; manual browser verification for UI behavior.
+**Testing**: Node.js 20+ built-in test runner (`node:test`, `node:assert`), invoked with `npm test`. An optional browser runner (`tests/test-runner.html`) is also provided for visual testing.
 
-**Target Platform**: Desktop and tablet browsers; responsive web UI.
+**Target Platform**: Desktop and tablet browsers (Chrome, Firefox, Safari, Edge).
 
-**Project Type**: web-app
+**Project Type**: Client-side web application.
 
-**Performance Goals**: Convert and re-render results instantly for normal inputs; UI should stay responsive on common desktop browsers.
-
-**Constraints**: Single-page interface, no login/account flow, no financial advice or transaction processing, graceful handling of rate failures.
-
-**Scale/Scope**: Small application with one main screen, 4–10 currencies in the initial set, and no multi-user or backend persistence.
+**Constraints & Guarantees**:
+- Convert button is disabled when amount is empty.
+- Input must be strictly positive (`amount > 0`). Zero, negative, and non-numeric inputs are rejected by validation.
+- Same currencies resolve to 1:1 without network calls; source is labeled as `Local (1:1)` and date is displayed as "N/A".
+- Weekends and holidays display the latest published rate and its actual publication date returned by the API; dates are never falsified.
+- Offline mode uses cached rates ONLY for exact currency pairs and displays a prominent warning banner with the original publication date.
+- No synthetic or hard-coded fallback rates are permitted.
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*GATE: Must pass before implementation.*
 
-This feature aligns with the project constitution:
-
-- User value first: the app directly serves a clear conversion task.
-- Correctness over speed: validation and rate handling are explicit and testable.
-- Simplicity: the UI remains as a focused single-page workflow.
-- Accessibility: inputs, labels, and error states remain readable and keyboard-friendly.
-- Privacy and trust: no personal financial data is stored or required.
-- Maintainability: conversion logic is isolated and testable.
-
-No blocking constitution violations were identified. The design stays within the intended simple, reliable scope.
+- **User value first**: Direct, responsive conversion with clear error states and offline resilience.
+- **Correctness over speed**: Rigorous validation of inputs and API responses; exact-pair caching without inaccurate cross-pair inversions.
+- **Simplicity**: Zero build step required to run the web application; plain HTML, CSS, and JS.
+- **Accessibility**: Clear visual contrast, keyboard navigation, accessible labels, and screen-reader-friendly alert banners.
+- **Privacy and trust**: No user tracking, no third-party telemetry, transparent source and date indicators.
+- **Maintainability**: Modular decomposition (`converter.js`, `validation.js`, `rateService.js`, `ui.js`).
 
 ## Project Structure
 
@@ -56,31 +54,31 @@ specs/001-currency-converter/
 ├── contracts/
 │   └── exchange-rates.md
 ├── spec.md
-└── tasks.md          # generated in the next planning step
+└── tasks.md
 ```
 
-### Source Code (repository root)
+### Source Code & Tests (repository layout)
 
 ```text
-src/
-├── app.js
-├── converter.js
-├── rateService.js
-├── validation.js
-├── ui.js
-├── styles.css
-├── index.html
-└── data/
-    └── rates.json
-
-tests/
-├── converter.test.js
-├── validation.test.js
-└── rateService.test.js
+lab3-currency-converter/
+├── package.json
+├── src/
+│   ├── app.js
+│   ├── converter.js
+│   ├── currencies.js
+│   ├── rateService.js
+│   ├── validation.js
+│   ├── ui.js
+│   ├── styles.css
+│   └── index.html
+└── tests/
+    ├── test-runner.html
+    └── test-runner.js
 ```
 
-**Structure Decision**: A single-page browser application with isolated logic modules for conversion, validation, and rate loading. This keeps the feature small, testable, and easy to run without a backend.
-
-## Complexity Tracking
-
-No constitution violations require special justification for this feature. The design remains intentionally small and explicit.
+**Architecture Decisions**:
+1. `validation.js`: Pure functions validating numeric bounds (`amount > 0`, finite number, currency existence).
+2. `converter.js`: Pure math functions performing conversions, rounding, formatting, and 1:1 logic.
+3. `rateService.js`: Encapsulates Frankfurter API calls, response parsing, validation of received JSON, `localStorage` pair caching, and fallback resolution.
+4. `ui.js`: DOM manipulation, form state (disabling/enabling Convert button), rendering conversion results, date/source metadata, and warning/error banners.
+5. `tests/test-runner.js`: Complete test suite runnable in both Node.js (`npm test`) and the browser (`test-runner.html`).
