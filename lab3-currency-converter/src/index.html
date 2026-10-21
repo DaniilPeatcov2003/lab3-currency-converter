@@ -67,11 +67,12 @@
           </div>
 
           <p class="error-message" id="error-message" role="alert" hidden></p>
-          <button class="convert-button" id="convert-button" type="submit">
+          <button class="convert-button" id="convert-button" type="submit" disabled>
             Конвертировать <span aria-hidden="true">→</span>
           </button>
 
           <section class="result-panel" id="result-panel" aria-label="Результат" hidden>
+            <p class="warning-banner" id="warning-banner" role="status" hidden></p>
             <p class="result-label">Вы получите</p>
             <p class="result-line">
               <span id="result-caption"></span>

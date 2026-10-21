@@ -3,6 +3,15 @@ import { convertAmount } from "./converter.js";
 import { fetchExchangeRate, RateServiceError } from "./rateService.js";
 import { validateAmount } from "./validation.js";
 
+export function formatCacheTimestamp(savedAt) {
+  if (!Number.isFinite(savedAt)) return "неизвестно";
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(savedAt);
+}
+
 export function initializeConverter(root = document, getRate = fetchExchangeRate) {
   const form = root.querySelector("#converter-form");
   const amountInput = root.querySelector("#amount");
@@ -16,6 +25,7 @@ export function initializeConverter(root = document, getRate = fetchExchangeRate
   const resultCaption = root.querySelector("#result-caption");
   const resultCurrency = root.querySelector("#result-currency");
   const rateDetails = root.querySelector("#rate-details");
+  const warningBanner = root.querySelector("#warning-banner");
   const resultStatus = root.querySelector("#result-status");
 
   for (const { code, name } of currencies) {
@@ -41,6 +51,10 @@ export function initializeConverter(root = document, getRate = fetchExchangeRate
 
   function hideResult() {
     resultPanel.hidden = true;
+    if (warningBanner) {
+      warningBanner.textContent = "";
+      warningBanner.hidden = true;
+    }
     resultStatus.textContent = "";
   }
 
@@ -84,12 +98,23 @@ export function initializeConverter(root = document, getRate = fetchExchangeRate
       resultAmount.textContent = formatter.format(result.convertedAmount);
       resultCaption.textContent = `${formatter.format(result.amount)} ${result.fromCurrency} =`;
       resultCurrency.textContent = result.toCurrency;
-      rateDetails.textContent =
-        quote.date === null
-          ? `1 ${result.fromCurrency} = 1 ${result.toCurrency}`
-          : quote.cached
-            ? `Сохранённый курс Frankfurter на ${quote.date}. Нет подключения — используется последнее сохранённое значение.`
-            : `Последний опубликованный курс Frankfurter: 1 ${result.fromCurrency} = ${formatter.format(quote.rate)} ${result.toCurrency} · на ${quote.date}`;
+
+      if (quote.date === "N/A" || quote.date === null) {
+        rateDetails.textContent = `1 ${result.fromCurrency} = 1 ${result.toCurrency} · Источник: Local (1:1) · Дата: N/A`;
+        if (warningBanner) warningBanner.hidden = true;
+      } else if (quote.cached) {
+        const warningText = `⚠️ Внимание: отсутствует подключение к сети. Используется сохранённый курс от ${quote.date}.`;
+        const cachedAt = formatCacheTimestamp(quote.savedAt);
+        if (warningBanner) {
+          warningBanner.textContent = warningText;
+          warningBanner.hidden = false;
+        }
+        rateDetails.textContent = `Сохранённый курс Frankfurter (ЕЦБ): 1 ${result.fromCurrency} = ${formatter.format(quote.rate)} ${result.toCurrency} · Дата публикации: ${quote.date} · Сохранён: ${cachedAt}`;
+      } else {
+        if (warningBanner) warningBanner.hidden = true;
+        rateDetails.textContent = `Источник: Frankfurter / European Central Bank · Курс: 1 ${result.fromCurrency} = ${formatter.format(quote.rate)} ${result.toCurrency} · Дата публикации: ${quote.date}`;
+      }
+
       resultPanel.hidden = false;
     } catch (error) {
       if (requestId !== currentRequest) return;
@@ -103,7 +128,7 @@ export function initializeConverter(root = document, getRate = fetchExchangeRate
       errorMessage.hidden = false;
     } finally {
       if (requestId === currentRequest) {
-        submitButton.disabled = false;
+        submitButton.disabled = amountInput.value.trim().length === 0;
         submitButton.textContent = "Конвертировать";
         resultStatus.textContent = resultPanel.hidden
           ? "Конвертация не выполнена."

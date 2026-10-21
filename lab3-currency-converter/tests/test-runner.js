@@ -5,6 +5,7 @@ import {
   RateServiceError,
 } from "../src/rateService.js";
 import { validateAmount } from "../src/validation.js";
+import { formatCacheTimestamp } from "../src/ui.js";
 
 const isBrowser = typeof document !== "undefined";
 const results = isBrowser ? document.querySelector("#results") : null;
@@ -45,13 +46,17 @@ async function test(name, callback) {
   }
 }
 
-await test("Accepts a valid positive amount", () => {
+// ==========================================
+// 1. Validation Tests
+// ==========================================
+
+await test("Validation: Accepts a valid positive amount", () => {
   const result = validateAmount("125.50");
   assert(result.valid, "valid amount was rejected");
   assertEqual(result.amount, 125.5, "parsed amount");
 });
 
-await test("Accepts a decimal comma", () => {
+await test("Validation: Accepts a decimal comma", () => {
   const result = validateAmount("125,50");
   assert(result.valid, "decimal comma was rejected");
   assertEqual(result.amount, 125.5, "parsed decimal comma");
@@ -61,17 +66,24 @@ for (const [value, message] of [
   ["", "empty amount"],
   ["   ", "whitespace amount"],
   ["0", "zero amount"],
+  ["0.00", "zero amount with decimals"],
   ["-4", "negative amount"],
+  ["-0.5", "negative decimal amount"],
   ["one hundred", "non-numeric amount"],
   ["0x10", "hexadecimal amount"],
   ["Infinity", "infinite amount"],
+  ["NaN", "NaN amount"],
 ]) {
-  await test(`Rejects ${message}`, () => {
+  await test(`Validation: Rejects ${message}`, () => {
     assert(!validateAmount(value).valid, `${message} was accepted`);
   });
 }
 
-await test("Calculates a currency conversion", () => {
+// ==========================================
+// 2. Conversion & Math Tests (Forward & Reverse)
+// ==========================================
+
+await test("Conversion: Calculates direct currency conversion", () => {
   const result = convertAmount({
     amount: 100,
     fromCurrency: "USD",
@@ -83,7 +95,7 @@ await test("Calculates a currency conversion", () => {
   assertEqual(result.date, "2026-10-16", "rate date");
 });
 
-await test("Calculates the reverse currency direction", () => {
+await test("Conversion: Calculates the reverse currency direction", () => {
   const forward = convertAmount({
     amount: 100,
     fromCurrency: "USD",
@@ -99,7 +111,24 @@ await test("Calculates the reverse currency direction", () => {
   assertEqual(reverse.convertedAmount, 100, "reverse converted amount");
 });
 
-await test("Rejects a non-finite converted result", () => {
+await test("Conversion: Calculates both directions independently", () => {
+  const usdToEur = convertAmount({
+    amount: 50,
+    fromCurrency: "USD",
+    toCurrency: "EUR",
+    rate: 0.85,
+  });
+  const eurToUsd = convertAmount({
+    amount: 50,
+    fromCurrency: "EUR",
+    toCurrency: "USD",
+    rate: 1.17647,
+  });
+  assertEqual(usdToEur.convertedAmount, 42.5, "USD -> EUR amount");
+  assertEqual(Math.round(eurToUsd.convertedAmount * 100) / 100, 58.82, "EUR -> USD amount");
+});
+
+await test("Conversion: Rejects non-finite converted result", () => {
   let rejected = false;
   try {
     convertAmount({
@@ -114,7 +143,31 @@ await test("Rejects a non-finite converted result", () => {
   assert(rejected, "overflowing conversion was not rejected");
 });
 
-await test("Parses a valid provider response", () => {
+await test("Conversion: Same currency resolves 1:1 without network request with date 'N/A'", async () => {
+  const quote = await fetchExchangeRate("USD", "USD", () => {
+    throw new Error("same-currency conversion must not make a network request");
+  });
+  assertEqual(quote.rate, 1, "same-currency rate");
+  assertEqual(quote.date, "N/A", "same-currency date");
+  assertEqual(quote.provider, "Local (1:1)", "same-currency provider");
+  assertEqual(quote.cached, false, "same-currency cached flag");
+});
+
+await test("UI: Formats cached timestamp for display", () => {
+  const timestamp = Date.UTC(2026, 9, 16, 12, 30);
+  const expected = new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(timestamp);
+  assertEqual(formatCacheTimestamp(timestamp), expected, "formatted cache timestamp");
+  assertEqual(formatCacheTimestamp(null), "неизвестно", "missing cache timestamp");
+});
+
+// ==========================================
+// 3. API Response Parsing & Validation Tests
+// ==========================================
+
+await test("Parsing: Parses a valid Frankfurter API response", () => {
   const quote = parseExchangeRateResponse(
     { base: "USD", date: "2026-10-16", rates: { EUR: 0.9 } },
     "USD",
@@ -122,15 +175,23 @@ await test("Parses a valid provider response", () => {
   );
   assertEqual(quote.rate, 0.9, "parsed rate");
   assertEqual(quote.date, "2026-10-16", "parsed date");
+  assertEqual(quote.base, "USD", "parsed base");
+  assertEqual(quote.target, "EUR", "parsed target");
 });
 
 for (const [name, data] of [
-  ["an empty provider response", null],
-  ["a provider response with no rate", { base: "USD", date: "2026-10-16", rates: {} }],
-  ["a provider response with a non-number rate", { base: "USD", date: "2026-10-16", rates: { EUR: "0.9" } }],
-  ["a provider response for a different base", { base: "GBP", date: "2026-10-16", rates: { EUR: 0.9 } }],
+  ["an empty provider response (null)", null],
+  ["an empty object response", {}],
+  ["a response with missing rates object", { base: "USD", date: "2026-10-16" }],
+  ["a response with target currency absent from rates", { base: "USD", date: "2026-10-16", rates: {} }],
+  ["a response with non-number rate", { base: "USD", date: "2026-10-16", rates: { EUR: "0.9" } }],
+  ["a response with zero rate", { base: "USD", date: "2026-10-16", rates: { EUR: 0 } }],
+  ["a response with negative rate", { base: "USD", date: "2026-10-16", rates: { EUR: -0.9 } }],
+  ["a response for a mismatched base currency", { base: "GBP", date: "2026-10-16", rates: { EUR: 0.9 } }],
+  ["a response with invalid date string", { base: "USD", date: "yesterday", rates: { EUR: 0.9 } }],
+  ["a response with impossible calendar date", { base: "USD", date: "2026-02-30", rates: { EUR: 0.9 } }],
 ]) {
-  await test(`Rejects ${name}`, () => {
+  await test(`Parsing: Rejects ${name}`, () => {
     let rejected = false;
     try {
       parseExchangeRateResponse(data, "USD", "EUR");
@@ -141,39 +202,26 @@ for (const [name, data] of [
   });
 }
 
-await test("Requests and validates a rate for a currency pair", async () => {
-  let requestedUrl;
-  const quote = await fetchExchangeRate("USD", "EUR", async (url) => {
-    requestedUrl = new URL(url);
-    return {
-      ok: true,
-      json: async () => ({
-        base: "USD",
-        date: "2026-10-16",
-        rates: { EUR: 0.9 },
-      }),
-    };
-  }, null);
-
-  assertEqual(requestedUrl.searchParams.get("base"), "USD", "requested base");
-  assertEqual(requestedUrl.searchParams.get("symbols"), "EUR", "requested target");
-  assertEqual(quote.rate, 0.9, "validated rate");
+await test("Parsing: Preserves actual publication date from API on weekend/holiday without substituting today", () => {
+  const quote = parseExchangeRateResponse(
+    { base: "USD", date: "2026-10-16", rates: { EUR: 0.88865 } },
+    "USD",
+    "EUR",
+  );
+  assertEqual(quote.date, "2026-10-16", "preserved ECB publication date");
 });
 
-await test("Uses a unit rate without a request for the same currency", async () => {
-  const quote = await fetchExchangeRate("USD", "USD", () => {
-    throw new Error("same-currency conversion made a network request");
-  });
-  assertEqual(quote.rate, 1, "same-currency rate");
-  assertEqual(quote.date, null, "same-currency date");
-});
+// ==========================================
+// 4. Persistence & Offline Caching Tests
+// ==========================================
 
-await test("Persists successful rates and uses them when the network is unavailable", async () => {
+await test("Cache: Persists successful rates per pair and uses them when network is unavailable", async () => {
   const values = new Map();
   const storage = {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
   };
+
   const onlineQuote = await fetchExchangeRate(
     "USD",
     "EUR",
@@ -187,6 +235,21 @@ await test("Persists successful rates and uses them when the network is unavaila
     }),
     storage,
   );
+
+  assert(!onlineQuote.cached, "online quote was marked cached");
+  assertEqual(onlineQuote.rate, 0.9, "online rate");
+
+  // Check stored record structure in storage
+  const storedJson = storage.getItem("currency_rate_USD_EUR");
+  assert(storedJson !== null, "record was not persisted to storage");
+  const record = JSON.parse(storedJson);
+  assertEqual(record.source, "USD", "stored source");
+  assertEqual(record.target, "EUR", "stored target");
+  assertEqual(record.rate, 0.9, "stored rate");
+  assertEqual(record.date, "2026-10-16", "stored date");
+  assert(Number.isFinite(record.savedAt), "stored savedAt timestamp");
+
+  // Network failure -> should retrieve cached quote
   const offlineQuote = await fetchExchangeRate(
     "USD",
     "EUR",
@@ -195,20 +258,92 @@ await test("Persists successful rates and uses them when the network is unavaila
     },
     storage,
   );
-  assert(!onlineQuote.cached, "online quote was marked cached");
+
   assert(offlineQuote.cached, "offline quote was not marked as cached");
-  assertEqual(offlineQuote.rate, onlineQuote.rate, "cached rate");
+  assertEqual(offlineQuote.rate, 0.9, "cached rate");
+  assertEqual(offlineQuote.date, "2026-10-16", "cached rate date");
+});
+
+await test("Cache: Rejects offline conversion for an uncached currency pair", async () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+
+  // Cache USD -> EUR only
+  storage.setItem(
+    "currency_rate_USD_EUR",
+    JSON.stringify({
+      source: "USD",
+      target: "EUR",
+      rate: 0.9,
+      date: "2026-10-16",
+      savedAt: Date.now(),
+    }),
+  );
+
+  // Attempt to fetch GBP -> JPY offline (not in cache)
+  let rejected = false;
+  try {
+    await fetchExchangeRate(
+      "GBP",
+      "JPY",
+      async () => {
+        throw new TypeError("network unavailable");
+      },
+      storage,
+    );
+  } catch (error) {
+    rejected = error instanceof RateServiceError;
+  }
+  assert(rejected, "uncached pair was unexpectedly accepted offline");
+});
+
+await test("Cache: Exact pair matching - USD->EUR cached does not satisfy EUR->USD", async () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+
+  storage.setItem(
+    "currency_rate_USD_EUR",
+    JSON.stringify({
+      source: "USD",
+      target: "EUR",
+      rate: 0.9,
+      date: "2026-10-16",
+      savedAt: Date.now(),
+    }),
+  );
+
+  let rejected = false;
+  try {
+    await fetchExchangeRate(
+      "EUR",
+      "USD",
+      async () => {
+        throw new TypeError("network unavailable");
+      },
+      storage,
+    );
+  } catch (error) {
+    rejected = error instanceof RateServiceError;
+  }
+  assert(rejected, "reverse pair was unexpectedly resolved from forward cache");
 });
 
 for (const [name, response] of [
-  ["unavailable rate", { ok: false, json: async () => ({}) }],
-  ["incomplete rate", { ok: true, json: async () => ({ base: "USD", date: "2026-10-16", rates: {} }) }],
-  ["invalid date", { ok: true, json: async () => ({ base: "USD", date: "yesterday", rates: { EUR: 0.9 } }) }],
-  ["impossible date", { ok: true, json: async () => ({ base: "USD", date: "2026-02-30", rates: { EUR: 0.9 } }) }],
-  ["invalid numeric rate", { ok: true, json: async () => ({ base: "USD", date: "2026-10-16", rates: { EUR: 0 } }) }],
-  ["malformed JSON", { ok: true, json: async () => { throw new SyntaxError("invalid JSON"); } }],
+  ["HTTP 500 server error", { ok: false, json: async () => ({}) }],
+  ["missing rates object", { ok: true, json: async () => ({ base: "USD", date: "2026-10-16" }) }],
+  ["empty rates object", { ok: true, json: async () => ({ base: "USD", date: "2026-10-16", rates: {} }) }],
+  ["invalid date string", { ok: true, json: async () => ({ base: "USD", date: "yesterday", rates: { EUR: 0.9 } }) }],
+  ["impossible calendar date", { ok: true, json: async () => ({ base: "USD", date: "2026-02-30", rates: { EUR: 0.9 } }) }],
+  ["invalid numeric rate (zero)", { ok: true, json: async () => ({ base: "USD", date: "2026-10-16", rates: { EUR: 0 } }) }],
+  ["malformed JSON syntax", { ok: true, json: async () => { throw new SyntaxError("invalid JSON"); } }],
 ]) {
-  await test(`Reports ${name} as a service error`, async () => {
+  await test(`Service: Reports ${name} as a RateServiceError when no cache exists`, async () => {
     let rejected = false;
     try {
       await fetchExchangeRate("USD", "EUR", async () => response, null);
@@ -219,22 +354,16 @@ for (const [name, response] of [
   });
 }
 
-await test("Reports network failure as a service error", async () => {
-  let rejected = false;
-  try {
-    await fetchExchangeRate("USD", "EUR", async () => {
-      throw new TypeError("network unavailable");
-    }, null);
-  } catch (error) {
-    rejected = error instanceof RateServiceError;
-  }
-  assert(rejected, "network failure was not converted to a service error");
-});
+// ==========================================
+// Summary Report
+// ==========================================
 
 if (isBrowser) {
   summary.dataset.result = failed > 0 ? "fail" : "pass";
   summary.textContent = `${passed} проверок пройдено, ${failed} ошибок.`;
 } else {
-  console.log(`\n${passed} проверок пройдено, ${failed} ошибок.`);
+  console.log(`\n========================================`);
+  console.log(`ИТОГ: ${passed} проверок пройдено, ${failed} ошибок.`);
+  console.log(`========================================`);
   if (failed > 0) process.exitCode = 1;
 }

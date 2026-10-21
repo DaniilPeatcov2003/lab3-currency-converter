@@ -236,8 +236,8 @@ input[aria-invalid="true"] {
 }
 
 .convert-button:disabled {
-  cursor: wait;
-  opacity: 0.76;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .error-message {
@@ -245,6 +245,18 @@ input[aria-invalid="true"] {
   color: #b42323;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.warning-banner {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid #edd185;
+  border-radius: 8px;
+  background: #fff9e6;
+  color: #855d00;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
 }
 
 .result-panel {

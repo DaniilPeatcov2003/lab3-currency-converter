@@ -1,7 +1,7 @@
 import { currencyCodes } from "./currencies.js";
 
 const API_BASE_URL = "https://api.frankfurter.dev/v1/latest";
-const CACHE_PREFIX = "currency-converter:rate:";
+const CACHE_PREFIX = "currency_rate_";
 
 function isIsoDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -28,7 +28,13 @@ export function parseExchangeRateResponse(data, fromCurrency, toCurrency) {
     throw new RateServiceError("Сервис курсов вернул неполные или некорректные данные.");
   }
 
-  return { base: fromCurrency, target: toCurrency, rate, date: data.date };
+  return {
+    base: fromCurrency,
+    target: toCurrency,
+    rate,
+    date: data.date,
+    provider: "Frankfurter / European Central Bank",
+  };
 }
 
 function getStorage(storage) {
@@ -42,34 +48,59 @@ function getStorage(storage) {
 }
 
 function cacheKey(fromCurrency, toCurrency) {
-  return `${CACHE_PREFIX}${fromCurrency}:${toCurrency}`;
+  return `${CACHE_PREFIX}${fromCurrency}_${toCurrency}`;
 }
 
-function readCachedRate(storage, fromCurrency, toCurrency) {
+export function readCachedRate(storage, fromCurrency, toCurrency) {
   if (!storage) return null;
 
   try {
-    const cachedValue = storage.getItem(cacheKey(fromCurrency, toCurrency));
-    if (!cachedValue) return null;
-    return parseExchangeRateResponse(JSON.parse(cachedValue), fromCurrency, toCurrency);
+    const rawValue = storage.getItem(cacheKey(fromCurrency, toCurrency));
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue);
+
+    // Support schema: { source, target, rate, date, savedAt }
+    if (
+      (parsed.source === fromCurrency || parsed.base === fromCurrency) &&
+      isIsoDate(parsed.date)
+    ) {
+      const targetRate =
+        Number.isFinite(parsed.rate) && parsed.rate > 0
+          ? parsed.rate
+          : parsed.rates?.[toCurrency];
+
+      if (Number.isFinite(targetRate) && targetRate > 0) {
+        return {
+          base: fromCurrency,
+          target: toCurrency,
+          rate: targetRate,
+          date: parsed.date,
+          savedAt: parsed.savedAt ?? null,
+          provider: "Frankfurter / European Central Bank",
+        };
+      }
+    }
+
+    return null;
   } catch (error) {
     console.warn("Could not read a cached exchange rate:", error);
     return null;
   }
 }
 
-function writeCachedRate(storage, quote) {
+export function writeCachedRate(storage, quote) {
   if (!storage) return;
 
   try {
-    storage.setItem(
-      cacheKey(quote.base, quote.target),
-      JSON.stringify({
-        base: quote.base,
-        date: quote.date,
-        rates: { [quote.target]: quote.rate },
-      }),
-    );
+    const record = {
+      source: quote.base,
+      target: quote.target,
+      rate: quote.rate,
+      date: quote.date,
+      savedAt: Date.now(),
+    };
+    storage.setItem(cacheKey(quote.base, quote.target), JSON.stringify(record));
   } catch (error) {
     console.warn("Could not persist the exchange rate cache:", error);
   }
@@ -92,7 +123,14 @@ export async function fetchExchangeRate(
   }
 
   if (fromCurrency === toCurrency) {
-    return { base: fromCurrency, target: toCurrency, rate: 1, date: null, cached: false };
+    return {
+      base: fromCurrency,
+      target: toCurrency,
+      rate: 1,
+      date: "N/A",
+      cached: false,
+      provider: "Local (1:1)",
+    };
   }
 
   const persistentStorage = getStorage(storage);

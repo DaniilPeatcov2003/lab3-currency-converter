@@ -1,4 +1,10 @@
-export function convertAmount({ amount, fromCurrency, toCurrency, rate, date = null }) {
+export function convertAmount({
+  amount,
+  fromCurrency,
+  toCurrency,
+  rate,
+  date = "N/A",
+}) {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new RangeError("Amount must be a finite positive number.");
   }

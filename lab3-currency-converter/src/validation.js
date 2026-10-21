@@ -1,5 +1,5 @@
 export function validateAmount(value) {
-  const normalizedValue = String(value).trim();
+  const normalizedValue = String(value ?? "").trim();
 
   if (!normalizedValue) {
     return { valid: false, message: "Введите сумму для конвертации." };
