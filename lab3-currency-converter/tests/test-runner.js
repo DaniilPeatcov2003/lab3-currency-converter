@@ -5,6 +5,7 @@ import {
   RateServiceError,
 } from "../src/rateService.js";
 import { validateAmount } from "../src/validation.js";
+import { formatCacheTimestamp } from "../src/ui.js";
 
 const isBrowser = typeof document !== "undefined";
 const results = isBrowser ? document.querySelector("#results") : null;
@@ -150,6 +151,16 @@ await test("Conversion: Same currency resolves 1:1 without network request with 
   assertEqual(quote.date, "N/A", "same-currency date");
   assertEqual(quote.provider, "Local (1:1)", "same-currency provider");
   assertEqual(quote.cached, false, "same-currency cached flag");
+});
+
+await test("UI: Formats cached timestamp for display", () => {
+  const timestamp = Date.UTC(2026, 9, 16, 12, 30);
+  const expected = new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(timestamp);
+  assertEqual(formatCacheTimestamp(timestamp), expected, "formatted cache timestamp");
+  assertEqual(formatCacheTimestamp(null), "неизвестно", "missing cache timestamp");
 });
 
 // ==========================================

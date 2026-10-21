@@ -3,6 +3,15 @@ import { convertAmount } from "./converter.js";
 import { fetchExchangeRate, RateServiceError } from "./rateService.js";
 import { validateAmount } from "./validation.js";
 
+export function formatCacheTimestamp(savedAt) {
+  if (!Number.isFinite(savedAt)) return "неизвестно";
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(savedAt);
+}
+
 export function initializeConverter(root = document, getRate = fetchExchangeRate) {
   const form = root.querySelector("#converter-form");
   const amountInput = root.querySelector("#amount");
@@ -95,11 +104,12 @@ export function initializeConverter(root = document, getRate = fetchExchangeRate
         if (warningBanner) warningBanner.hidden = true;
       } else if (quote.cached) {
         const warningText = `⚠️ Внимание: отсутствует подключение к сети. Используется сохранённый курс от ${quote.date}.`;
+        const cachedAt = formatCacheTimestamp(quote.savedAt);
         if (warningBanner) {
           warningBanner.textContent = warningText;
           warningBanner.hidden = false;
         }
-        rateDetails.textContent = `Сохранённый курс Frankfurter (ЕЦБ): 1 ${result.fromCurrency} = ${formatter.format(quote.rate)} ${result.toCurrency} · Дата публикации: ${quote.date}`;
+        rateDetails.textContent = `Сохранённый курс Frankfurter (ЕЦБ): 1 ${result.fromCurrency} = ${formatter.format(quote.rate)} ${result.toCurrency} · Дата публикации: ${quote.date} · Сохранён: ${cachedAt}`;
       } else {
         if (warningBanner) warningBanner.hidden = true;
         rateDetails.textContent = `Источник: Frankfurter / European Central Bank · Курс: 1 ${result.fromCurrency} = ${formatter.format(quote.rate)} ${result.toCurrency} · Дата публикации: ${quote.date}`;
